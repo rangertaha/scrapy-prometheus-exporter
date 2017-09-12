@@ -1,11 +1,11 @@
-import uuid
+import sys
 import logging
 
 from prometheus_client.twisted import MetricsResource
 from prometheus_client import Counter, Summary, Gauge
 from twisted.web.server import Site
 from twisted.web.resource import Resource
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from scrapy import signals
 
 logger = logging.getLogger(__name__)
@@ -269,54 +269,6 @@ logger = logging.getLogger(__name__)
 #
 #
 #
-#
-#
-# import os
-# from six.moves import cPickle as pickle
-#
-# from scrapy import signals
-# from scrapy.exceptions import NotConfigured
-# from scrapy.utils.job import job_dir
-#
-# class SpiderState(object):
-#     """Store and load spider state during a scraping job"""
-#
-#     def __init__(self, jobdir=None):
-#         self.jobdir = jobdir
-#
-#     @classmethod
-#     def from_crawler(cls, crawler):
-#         jobdir = job_dir(crawler.settings)
-#         if not jobdir:
-#             raise NotConfigured
-#
-#         obj = cls(jobdir)
-#         crawler.signals.connect(obj.spider_closed, signal=signals.spider_closed)
-#         crawler.signals.connect(obj.spider_opened, signal=signals.spider_opened)
-#         return obj
-#
-#     def spider_closed(self, spider):
-#         if self.jobdir:
-#             with open(self.statefn, 'wb') as f:
-#                 pickle.dump(spider.state, f, protocol=2)
-#
-#     def spider_opened(self, spider):
-#         if self.jobdir and os.path.exists(self.statefn):
-#             with open(self.statefn, 'rb') as f:
-#                 spider.state = pickle.load(f)
-#         else:
-#             spider.state = {}
-#
-#     @property
-#     def statefn(self):
-#         return os.path.join(self.jobdir, 'spider.state')
-#
-
-
-
-
-
-
 
 
 
@@ -333,18 +285,20 @@ class Prometheus(Site):
 
     """
     def __init__(self, crawler):
+        self.tasks = []
         self.crawler = crawler
-        self.uuid = uuid.uuid4().hex
+        #self.uuid = uuid.uuid4().hex
         self.name = crawler.settings.get('BOT_NAME')
-        self.port = crawler.settings.get('PROMETHEUS_PORT', 8888)
+        self.port = crawler.settings.get('PROMETHEUS_PORT', 9999)
         self.host = crawler.settings.get('PROMETHEUS_HOST', '127.0.0.1')
         self.path = crawler.settings.get('PROMETHEUS_PATH', 'metrics')
+        self.interval = crawler.settings.getfloat('PROMETHEUS_UPDATE_INTERVAL_SECONDS', 1)
 
-        self.spider_item_scraped = Counter('spider_items_scraped', 'Number of items scraped', ['name', 'uuid'])
-        self.spider_item_dropped = Counter('spider_items_dropped', 'Number of items dropped', ['name', 'uuid'])
-        self.spider_response_received = Counter('spider_response_received', 'Number of responses received', ['name', 'uuid'])
-        self.spider_opened_count = Counter('spider_opened_count', 'Spider opened count', ['name', 'uuid'])
-        self.spider_closed_count = Counter('spider_closed_count', 'Spider closed count', ['name', 'uuid'])
+        self.spr_item_scraped = Counter('spr_items_scraped', 'Spider items scraped', ['spider'])
+        self.spr_item_dropped = Counter('spr_items_dropped', 'Spider items dropped', ['spider'])
+        self.spr_response_received = Counter('spr_response_received', 'Spider responses received', ['spider'])
+        self.spr_opened = Counter('spr_opened', 'Spider opened', ['spider'])
+        self.spr_closed = Counter('spr_closed', 'Spider closed', ['spider'])
 
         # from prometheus_client import Gauge
         # g = Gauge('my_inprogress_requests', 'Description of gauge')
@@ -378,23 +332,34 @@ class Prometheus(Site):
         factory = Site(self.root)
         reactor.listenTCP(self.port, factory)
         reactor.run()
-
         logger.debug('Exporting metrics on port 8888')
+
+        tsk = task.LoopingCall(self.get_virtual_size)
+        self.tasks.append(tsk)
+        tsk.start(self.interval, now=True)
 
     def stop_listening(self):
         reactor.stop()
 
     def spider_opened(self, spider):
-        self.spider_opened_count.labels(name=self.name, uuid=self.uuid).inc()
+        self.spr_opened.labels(spider=self.name).inc()
 
     def spider_closed(self, spider, reason):
-        self.spider_closed_count.labels(name=self.name, uuid=self.uuid).inc()
+        self.spr_closed.labels(spider=self.name).inc()
 
     def item_scraped(self, item, spider):
-        self.spider_item_scraped.labels(name=self.name, uuid=self.uuid).inc()
+        self.spr_item_scraped.labels(spider=self.name).inc()
 
     def response_received(self, spider):
-        self.spider_response_received.labels(name=self.name, uuid=self.uuid).inc()
+        self.spr_response_received.labels(spider=self.name).inc()
 
     def item_dropped(self, item, spider, exception):
-        self.spider_item_scraped.labels(name=self.name, uuid=self.uuid).inc()
+        self.spr_item_scraped.labels(spider=self.name).inc()
+
+    def get_virtual_size(self):
+        size = self.resource.getrusage(self.resource.RUSAGE_SELF).ru_maxrss
+        if sys.platform != 'darwin':
+            # on Mac OS X ru_maxrss is in bytes, on Linux it is in KB
+            size *= 1024
+        self.spr_item_
+        return size
