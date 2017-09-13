@@ -299,6 +299,7 @@ class Prometheus(Site):
         self.spr_response_received = Counter('spr_response_received', 'Spider responses received', ['spider'])
         self.spr_opened = Counter('spr_opened', 'Spider opened', ['spider'])
         self.spr_closed = Counter('spr_closed', 'Spider closed', ['spider'])
+        self.spr_memory_usage = Counter('spr_memory_usage', 'Spider memory usage', ['spider'])
 
         # from prometheus_client import Gauge
         # g = Gauge('my_inprogress_requests', 'Description of gauge')
@@ -314,31 +315,61 @@ class Prometheus(Site):
         self.root.putChild(self.path, MetricsResource())
         self.noisy = False
 
-        crawler.signals.connect(self.start_listening, signals.engine_started)
-        crawler.signals.connect(self.stop_listening, signals.engine_stopped)
+        crawler.signals.connect(self.engine_started, signals.engine_started)
+        crawler.signals.connect(self.engine_stopped, signals.engine_stopped)
+
+        crawler.signals.connect(self.spider_opened, signal=signals.spider_opened)
+        crawler.signals.connect(self.spider_closed, signal=signals.spider_closed)
+        crawler.signals.connect(self.item_scraped, signal=signals.item_scraped)
+        crawler.signals.connect(self.item_dropped, signal=signals.item_dropped)
+        crawler.signals.connect(self.response_received, signal=signals.response_received)
 
     @classmethod
     def from_crawler(cls, crawler):
-        o = cls(crawler)
-        crawler.signals.connect(o.spider_opened, signal=signals.spider_opened)
-        crawler.signals.connect(o.spider_closed, signal=signals.spider_closed)
-        crawler.signals.connect(o.item_scraped, signal=signals.item_scraped)
-        crawler.signals.connect(o.item_dropped, signal=signals.item_dropped)
-        crawler.signals.connect(o.response_received, signal=signals.response_received)
-        return o
+        return cls(crawler)
 
-    def start_listening(self):
-        print self.crawler.stats.get_stats()
-        factory = Site(self.root)
-        reactor.listenTCP(self.port, factory)
-        reactor.run()
-        logger.debug('Exporting metrics on port 8888')
+    # def start_listening(self):
+    #     print self.crawler.stats.get_stats()
+    #     factory = Site(self.root)
+    #     reactor.listenTCP(self.port, factory)
+    #     reactor.run()
+    #     logger.debug('Exporting metrics on port 8888')
+    #
+    #     tsk = task.LoopingCall(self.memory_usage)
+    #     self.tasks.append(tsk)
+    #     tsk.start(self.interval, now=True)
 
-        tsk = task.LoopingCall(self.get_virtual_size)
+    def engine_started(self):
+        self.start_prometheus_endpoint()
+        self.update()
+
+        tsk = task.LoopingCall(self.update)
         self.tasks.append(tsk)
         tsk.start(self.interval, now=True)
 
-    def stop_listening(self):
+        print self.crawler.stats.get_stats()
+
+
+        #self.crawler.stats.set_value('memusage/startup', self.get_virtual_size())
+        #self.tasks = []
+        # tsk = task.LoopingCall(self.update)
+        # self.tasks.append(tsk)
+        # tsk.start(self.check_interval, now=True)
+        # if self.limit:
+        #     tsk = task.LoopingCall(self._check_limit)
+        #     self.tasks.append(tsk)
+        #     tsk.start(self.check_interval, now=True)
+        # if self.warning:
+        #     tsk = task.LoopingCall(self._check_warning)
+        #     self.tasks.append(tsk)
+        #     tsk.start(self.check_interval, now=True)
+
+    def engine_stopped(self):
+        for tsk in self.tasks:
+            if tsk.running:
+                tsk.stop()
+
+        # Stop Prometheus metrics server
         reactor.stop()
 
     def spider_opened(self, spider):
@@ -361,5 +392,24 @@ class Prometheus(Site):
         if sys.platform != 'darwin':
             # on Mac OS X ru_maxrss is in bytes, on Linux it is in KB
             size *= 1024
-        self.spr_item_
+        print size
         return size
+
+    def start_prometheus_endpoint(self):
+        factory = Site(self.root)
+        reactor.listenTCP(self.port, factory)
+        reactor.run()
+        logger.debug('Exporting metrics on port 8888')
+
+    def update(self):
+        iscount = self.stats.get_value('spr_item_dropped_count', 0)
+        self.spr_item_dropped.labels(spider=self.name).inc(iscount)
+
+        iscount = self.stats.get_value('item_scraped_count', 0)
+        self.spr_item_scraped.labels(spider=self.name).inc(iscount)
+
+        rrcount = self.stats.get_value('response_received_count', 0)
+        self.spr_response_received.labels(spider=self.name).inc(rrcount)
+
+        memusage = self.get_virtual_size()
+        self.spr_memory_usage.labels(spider=self.name).inc(memusage)
