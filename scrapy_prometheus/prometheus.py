@@ -76,7 +76,7 @@ class Prometheus(Site):
         return cls(crawler)
 
     def engine_started(self):
-        self.promtheus = listen_tcp([self.port], 'websorbing', self)
+        self.promtheus = listen_tcp([self.port], self.host, self)
         self.update()
 
         # Periodically update the metrics
