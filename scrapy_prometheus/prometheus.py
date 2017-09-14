@@ -6,9 +6,11 @@ from prometheus_client import Counter, Summary, Gauge
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import reactor, task
+from scrapy.utils.reactor import listen_tcp
 from scrapy import signals
 
 logger = logging.getLogger(__name__)
+
 
 #
 # import datetime
@@ -284,15 +286,17 @@ class Prometheus(Site):
     """
 
     """
-    def __init__(self, crawler):
+
+    def __init__(self, crawler, stats):
         self.tasks = []
+        self.stats = stats
         self.crawler = crawler
-        #self.uuid = uuid.uuid4().hex
+        # self.uuid = uuid.uuid4().hex
         self.name = crawler.settings.get('BOT_NAME')
         self.port = crawler.settings.get('PROMETHEUS_PORT', 9999)
         self.host = crawler.settings.get('PROMETHEUS_HOST', '127.0.0.1')
         self.path = crawler.settings.get('PROMETHEUS_PATH', 'metrics')
-        self.interval = crawler.settings.getfloat('PROMETHEUS_UPDATE_INTERVAL_SECONDS', 1)
+        self.interval = crawler.settings.get('PROMETHEUS_UPDATE_INTERVAL', 1)
 
         self.spr_item_scraped = Counter('spr_items_scraped', 'Spider items scraped', ['spider'])
         self.spr_item_dropped = Counter('spr_items_dropped', 'Spider items dropped', ['spider'])
@@ -311,9 +315,12 @@ class Prometheus(Site):
         # s = Summary('request_latency_seconds', 'Description of summary')
         # s.observe(4.7)  # Observe 4.7 (seconds in this case)
 
+
+        #
+        self.promtheus = None
         self.root = Resource()
         self.root.putChild(self.path, MetricsResource())
-        self.noisy = False
+        self.noisy = True
 
         crawler.signals.connect(self.engine_started, signals.engine_started)
         crawler.signals.connect(self.engine_stopped, signals.engine_stopped)
@@ -326,7 +333,7 @@ class Prometheus(Site):
 
     @classmethod
     def from_crawler(cls, crawler):
-        return cls(crawler)
+        return cls(crawler, crawler.stats)
 
     # def start_listening(self):
     #     print self.crawler.stats.get_stats()
@@ -340,18 +347,21 @@ class Prometheus(Site):
     #     tsk.start(self.interval, now=True)
 
     def engine_started(self):
+        print dir(self.stats)
+        print self.stats.get_stats()
         self.start_prometheus_endpoint()
         self.update()
 
+        # Periodically update the metrics
         tsk = task.LoopingCall(self.update)
         self.tasks.append(tsk)
         tsk.start(self.interval, now=True)
 
-        print self.crawler.stats.get_stats()
 
 
-        #self.crawler.stats.set_value('memusage/startup', self.get_virtual_size())
-        #self.tasks = []
+
+        # self.crawler.stats.set_value('memusage/startup', self.get_virtual_size())
+        # self.tasks = []
         # tsk = task.LoopingCall(self.update)
         # self.tasks.append(tsk)
         # tsk.start(self.check_interval, now=True)
@@ -370,7 +380,7 @@ class Prometheus(Site):
                 tsk.stop()
 
         # Stop Prometheus metrics server
-        reactor.stop()
+        self.promtheus.stopListening()
 
     def spider_opened(self, spider):
         self.spr_opened.labels(spider=self.name).inc()
@@ -392,18 +402,55 @@ class Prometheus(Site):
         if sys.platform != 'darwin':
             # on Mac OS X ru_maxrss is in bytes, on Linux it is in KB
             size *= 1024
-        print size
         return size
 
     def start_prometheus_endpoint(self):
         factory = Site(self.root)
-        reactor.listenTCP(self.port, factory)
-        reactor.run()
-        logger.debug('Exporting metrics on port 8888')
+        self.promtheus = listen_tcp([self.port], '127.0.0.1', factory)
+
+        # reactor.listenTCP(self.port, factory)
+
+        # logger.debug('LoopingCall')
+        # tsk = task.LoopingCall(reactor.run)
+        #
+        # logger.debug('tasks.append(tsk)')
+        # self.tasks.append(tsk)
+        #
+        # logger.debug('tsk.start {}'.format(self.interval))
+        #
+        # tsk.start(self.interval, now=True)
+        #
+        # logger.debug('Exporting metrics on port 8888')
 
     def update(self):
-        iscount = self.stats.get_value('spr_item_dropped_count', 0)
-        self.spr_item_dropped.labels(spider=self.name).inc(iscount)
+        """
+        {'downloader/request_bytes': 291,
+ 'downloader/request_count': 1,
+ 'downloader/request_method_count/GET': 1,
+ 'downloader/response_bytes': 13454,
+ 'downloader/response_count': 1,
+ 'downloader/response_status_count/200': 1,
+ 'finish_reason': 'finished',
+ 'finish_time': datetime.datetime(2017, 9, 14, 2, 11, 9, 395127),
+ 'log_count/DEBUG': 1,
+ 'log_count/ERROR': 1,
+ 'log_count/INFO': 8,
+ 'memdebug/gc_garbage_count': 0,
+ 'memdebug/live_refs/MySpider': 1,
+ 'memusage/max': 54104064,
+ 'memusage/startup': 54104064,
+ 'response_received_count': 1,
+ 'scheduler/dequeued': 1,
+ 'scheduler/dequeued/memory': 1,
+ 'scheduler/enqueued': 1,
+ 'scheduler/enqueued/memory': 1,
+
+        :return:
+        """
+
+        print self.crawler.stats.get_stats()
+        # iscount = self.crawler.stats.get_value('item_dropped_count', 0)
+        # self.spr_item_dropped.labels(spider=self.name).inc(iscount)
 
         iscount = self.stats.get_value('item_scraped_count', 0)
         self.spr_item_scraped.labels(spider=self.name).inc(iscount)

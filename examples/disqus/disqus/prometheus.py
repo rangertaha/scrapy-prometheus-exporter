@@ -1,4 +1,5 @@
 import sys
+import time
 import logging
 
 from prometheus_client.twisted import MetricsResource
@@ -300,7 +301,7 @@ class Prometheus(Site):
         self.spr_item_dropped = Counter('spr_items_dropped', 'Spider items dropped', ['spider'])
         self.spr_response_received = Counter('spr_response_received', 'Spider responses received', ['spider'])
         self.spr_opened = Counter('spr_opened', 'Spider opened', ['spider'])
-        self.spr_closed = Counter('spr_closed', 'Spider closed', ['spider'])
+        self.spr_closed = Counter('spr_closed', 'Spider closed', ['spider', 'reason'])
         self.spr_memory_usage = Counter('spr_memory_usage', 'Spider memory usage', ['spider'])
 
         # from prometheus_client import Gauge
@@ -379,12 +380,14 @@ class Prometheus(Site):
 
         # Stop Prometheus metrics server
         self.promtheus.stopListening()
+        time.sleep(30)
+
 
     def spider_opened(self, spider):
         self.spr_opened.labels(spider=self.name).inc()
 
     def spider_closed(self, spider, reason):
-        self.spr_closed.labels(spider=self.name).inc()
+        self.spr_closed.labels(spider=self.name, reason=reason).inc()
 
     def item_scraped(self, item, spider):
         self.spr_item_scraped.labels(spider=self.name).inc()
@@ -395,32 +398,28 @@ class Prometheus(Site):
     def item_dropped(self, item, spider, exception):
         self.spr_item_scraped.labels(spider=self.name).inc()
 
-    def get_virtual_size(self):
-        size = self.resource.getrusage(self.resource.RUSAGE_SELF).ru_maxrss
-        if sys.platform != 'darwin':
-            # on Mac OS X ru_maxrss is in bytes, on Linux it is in KB
-            size *= 1024
-        return size
 
     def start_prometheus_endpoint(self):
         factory = Site(self.root)
         self.promtheus = listen_tcp([self.port], '127.0.0.1', factory)
 
-        #reactor.listenTCP(self.port, factory)
-
-        #logger.debug('LoopingCall')
-        # tsk = task.LoopingCall(reactor.run)
-        #
-        # logger.debug('tasks.append(tsk)')
-        # self.tasks.append(tsk)
-        #
-        # logger.debug('tsk.start {}'.format(self.interval))
-        #
-        # tsk.start(self.interval, now=True)
-        #
-        # logger.debug('Exporting metrics on port 8888')
-
     def update(self):
+        """
+
+ 'memdebug/gc_garbage_count': 0,
+ 'memdebug/live_refs/MySpider': 1,
+ 'memusage/max': 54104064,
+ 'memusage/startup': 54104064,
+ 'response_received_count': 1,
+ 'scheduler/dequeued': 1,
+ 'scheduler/dequeued/memory': 1,
+ 'scheduler/enqueued': 1,
+ 'scheduler/enqueued/memory': 1,
+
+        :return:
+        """
+
+
         print self.crawler.stats.get_stats()
         # iscount = self.crawler.stats.get_value('item_dropped_count', 0)
         # self.spr_item_dropped.labels(spider=self.name).inc(iscount)
@@ -431,5 +430,17 @@ class Prometheus(Site):
         rrcount = self.stats.get_value('response_received_count', 0)
         self.spr_response_received.labels(spider=self.name).inc(rrcount)
 
-        memusage = self.get_virtual_size()
-        self.spr_memory_usage.labels(spider=self.name).inc(memusage)
+        # memusage = self.get_virtual_size()
+        # self.spr_memory_usage.labels(spider=self.name).inc(memusage)
+
+        print self.stats.get_value('downloader/request_bytes', 0)
+        print self.stats.get_value('downloader/request_count', 0)
+        print self.stats.get_value('downloader/request_method_count/GET', 0)
+        print self.stats.get_value('downloader/response_count', 0)
+        print self.stats.get_value('downloader/response_status_count/200', 0)
+        print self.stats.get_value('finish_reason', 0)
+        print self.stats.get_value('log_count/DEBUG', 0)
+        print self.stats.get_value('log_count/ERROR', 0)
+        print self.stats.get_value('log_count/INFO', 0)
+
+
