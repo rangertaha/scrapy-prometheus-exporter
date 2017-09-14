@@ -41,17 +41,25 @@ class Prometheus(Site):
         self.spr_downloader_request_get_count = Summary('spr_downloader_request_get', '...', ['spider'])
         self.spr_downloader_response_count = Summary('spr_downloader_response', '...', ['spider'])
         self.spr_downloader_response_status_count = Summary('spr_downloader_response_status', '...', ['spider', 'code'])
-        self.spr_log_count = Summary('spr_log_count', '...', ['spider', 'level'])
+
+        self.spr_log_count = Summary('spr_log', '...', ['spider', 'level'])
+
         self.spr_memdebug_gc_garbage_count = Summary('spr_memdebug_gc_garbage', '...', ['spider'])
         self.spr_memdebug_live_refs = Summary('spr_memdebug_live_refs', '...', ['spider'])
         self.spr_memusage_max = Summary('spr_memusage_max', '...', ['spider'])
         self.spr_memusage_startup = Summary('spr_memusage_startup', '...', ['spider'])
+
         self.spr_scheduler_dequeued = Summary('spr_scheduler_dequeued', '...', ['spider'])
         self.spr_scheduler_enqueued = Summary('spr_scheduler_enqueued', '...', ['spider'])
         self.spr_scheduler_enqueued_memory = Summary('spr_scheduler_enqueued_memory', '...', ['spider'])
+
         self.spr_offsite_domains_count = Summary('spr_offsite_domains', '...', ['spider'])
         self.spr_offsite_filtered_count = Summary('spr_offsite_filtered', '...', ['spider'])
 
+
+        # self.root = Resource()
+        # self.root.putChild(self.path, MetricsResource())
+        # self.noisy = True
 
         root = Resource()
         self.promtheus = None
