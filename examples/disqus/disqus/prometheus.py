@@ -14,7 +14,6 @@ from scrapy import signals
 logger = logging.getLogger(__name__)
 
 
-
 class Prometheus(Site):
     """
 
@@ -23,7 +22,6 @@ class Prometheus(Site):
         self.tasks = []
         self.stats = crawler.stats
         self.crawler = crawler
-        #self.uuid = uuid.uuid4().hex
         self.name = crawler.settings.get('BOT_NAME')
         self.port = crawler.settings.get('PROMETHEUS_PORT', 8888)
         self.host = crawler.settings.get('PROMETHEUS_HOST', '127.0.0.1')
@@ -55,11 +53,6 @@ class Prometheus(Site):
 
         self.spr_offsite_domains_count = Summary('spr_offsite_domains', '...', ['spider'])
         self.spr_offsite_filtered_count = Summary('spr_offsite_filtered', '...', ['spider'])
-
-
-        # self.root = Resource()
-        # self.root.putChild(self.path, MetricsResource())
-        # self.noisy = True
 
         root = Resource()
         self.promtheus = None
@@ -113,67 +106,66 @@ class Prometheus(Site):
 
     def update(self):
 
+        # Downloader Stats
+        #
         bytes = self.stats.get_value('downloader/request_bytes', 0)
         self.spr_downloader_request_bytes.labels(spider=self.name).observe(bytes)
 
+        drc_count = self.stats.get_value('downloader/request_count', 0)
+        self.spr_downloader_request_count.labels(spider=self.name).observe(drc_count)
 
-        count = self.stats.get_value('downloader/request_count', 0)
-        self.spr_downloader_request_count.labels(spider=self.name).observe(count)
+        drmc_count = self.stats.get_value('downloader/request_method_count/GET', 0)
+        self.spr_downloader_request_get_count.labels(spider=self.name).observe(drmc_count)
 
+        drpc_count = self.stats.get_value('downloader/response_count', 0)
+        self.spr_downloader_response_count.labels(spider=self.name).observe(drpc_count)
 
-        count = self.stats.get_value('downloader/request_method_count/GET', 0)
-        self.spr_downloader_request_get_count.labels(spider=self.name).observe(count)
+        for i in ['200', '404', '500']:
+            drs_status = self.stats.get_value('downloader/response_status_count/{}'.format(i), 0)
+            self.spr_downloader_response_status_count.labels(spider=self.name, code=i).observe(drs_status)
 
-        count = self.stats.get_value('downloader/response_count', 0)
-        self.spr_downloader_response_count.labels(spider=self.name).observe(count)
+        # Logging Stats
+        #
+        debug_count = self.stats.get_value('log_count/DEBUG', 0)
+        self.spr_log_count.labels(spider=self.name, level='DEBUG').observe(debug_count)
 
-        count = self.stats.get_value('downloader/response_status_count/200', 0)
-        self.spr_downloader_response_status_count.labels(spider=self.name, code='200').observe(count)
+        error_count = self.stats.get_value('log_count/ERROR', 0)
+        self.spr_log_count.labels(spider=self.name, level='ERROR').observe(error_count)
 
+        info_count = self.stats.get_value('log_count/INFO', 0)
+        self.spr_log_count.labels(spider=self.name, level='INFO').observe(info_count)
 
-        count = self.stats.get_value('log_count/DEBUG', 0)
-        self.spr_log_count.labels(spider=self.name, level='DEBUG').observe(count)
+        # Memory Debug Stats
+        #
+        mdgc_count = self.stats.get_value('memdebug/gc_garbage_count', 0)
+        self.spr_memdebug_gc_garbage_count.labels(spider=self.name).observe(mdgc_count)
 
+        mdlr_count = self.stats.get_value('memdebug/live_refs/MySpider', 0)
+        self.spr_memdebug_live_refs.labels(spider=self.name).observe(mdlr_count)
 
-        count = self.stats.get_value('log_count/ERROR', 0)
-        self.spr_log_count.labels(spider=self.name, level='ERROR').observe(count)
+        # Memory Usage Stats
+        #
+        mum_count = self.stats.get_value('memusage/max', 0)
+        self.spr_memusage_max.labels(spider=self.name).observe(mum_count)
 
+        mus_count = self.stats.get_value('memusage/startup', 0)
+        self.spr_memusage_startup.labels(spider=self.name).observe(mus_count)
 
-        count = self.stats.get_value('log_count/INFO', 0)
-        self.spr_log_count.labels(spider=self.name, level='INFO').observe(count)
+        # Scheduler Stats
+        #
+        sd_count = self.stats.get_value('scheduler/dequeued', 0)
+        self.spr_scheduler_dequeued.labels(spider=self.name).observe(sd_count)
 
+        se_count = self.stats.get_value('scheduler/enqueued', 0)
+        self.spr_scheduler_enqueued.labels(spider=self.name).observe(se_count)
 
-        count = self.stats.get_value('memdebug/gc_garbage_count', 0)
-        self.spr_memdebug_gc_garbage_count.labels(spider=self.name).observe(count)
+        sem_count = self.stats.get_value('scheduler/enqueued/memory', 0)
+        self.spr_scheduler_enqueued_memory.labels(spider=self.name).observe(sem_count)
 
+        # Off-Site Filtering Stats
+        #
+        od_count = self.stats.get_value('offsite/domains', 0)
+        self.spr_offsite_domains_count.labels(spider=self.name).observe(od_count)
 
-        count = self.stats.get_value('memdebug/live_refs/MySpider', 0)
-        self.spr_memdebug_live_refs.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('memusage/max', 0)
-        self.spr_memusage_max.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('memusage/startup', 0)
-        self.spr_memusage_startup.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('scheduler/dequeued', 0)
-        self.spr_scheduler_dequeued.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('scheduler/enqueued', 0)
-        self.spr_scheduler_enqueued.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('scheduler/enqueued/memory', 0)
-        self.spr_scheduler_enqueued_memory.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('offsite/domains', 0)
-        self.spr_offsite_domains_count.labels(spider=self.name).observe(count)
-
-
-        count = self.stats.get_value('offsite/filtered', 0)
-        self.spr_offsite_filtered_count.labels(spider=self.name).observe(count)
+        of_count = self.stats.get_value('offsite/filtered', 0)
+        self.spr_offsite_filtered_count.labels(spider=self.name).observe(of_count)
