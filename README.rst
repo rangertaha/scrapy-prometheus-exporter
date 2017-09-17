@@ -1,15 +1,17 @@
-=================
-scrapy-prometheus
-=================
+==========================
+scrapy-prometheus-exporter
+==========================
 
-scrapy-prometheus is an extension to export Scrapy stats for use with Prometheus
+scrapy-prometheus-exporter is an extension to export Scrapy stats to be used
+with Prometheus
+
 
 Installation
 ============
 
-Install scrapy-prometheus using ``pip``::
+Install scrapy-prometheus-exporter using ``pip``::
 
-    $ pip install scrapy-prometheus
+    $ pip install scrapy-prometheus-exporter
 
 Configuration
 =============
@@ -18,7 +20,7 @@ First, you need to include the extension to your ``EXTENSIONS`` dict in
 ``settings.py``, for example::
 
     EXTENSIONS = {
-        'scrapy_prometheus.prometheus.WebService': 500,
+        'scrapy_prometheus_exporter.prometheus.WebService': 500,
     }
 
 By default the extension is enabled. To disable the extension you need to

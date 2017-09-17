@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name='scrapy-prometheus-exporter',
     version='1.0.0',
-    url='https://github.com/rangertaha/scrapy-prometheus',
+    url='https://github.com/rangertaha/scrapy-prometheus-exporter',
     description='Scrapy extension to export stats to Prometheus',
     author='rangertaha',
     author_email='rangertaha@gmail.com',
