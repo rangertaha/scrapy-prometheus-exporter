@@ -5,12 +5,12 @@ scrapy-prometheus-exporter
 scrapy-prometheus-exporter is an extension to export Scrapy stats to be used
 with Prometheus
 
-.. image:: grafana/grafana.jpeg
+.. image:: /grafana/grafana.png
    :height: 100px
    :width: 200 px
    :scale: 50 %
-   :alt: alternate text
-   :align: right
+   :alt: Grafana dashboard of the exported data
+   :align: center
 
 
 Installation
