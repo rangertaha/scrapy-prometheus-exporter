@@ -5,23 +5,26 @@ from prometheus_client import Counter, Summary
 from twisted.web.server import Site
 from twisted.web import server, resource
 from twisted.internet import task
+from scrapy.exceptions import NotConfigured
 from scrapy.utils.reactor import listen_tcp
 from scrapy import signals
 
 logger = logging.getLogger(__name__)
 
 
-class Prometheus(Site):
+class WebService(Site):
     """
 
     """
     def __init__(self, crawler):
+        if not crawler.settings.getbool('PROMETHEUS_ENABLED', True):
+            raise NotConfigured
         self.tasks = []
         self.stats = crawler.stats
         self.crawler = crawler
         self.name = crawler.settings.get('BOT_NAME')
-        self.port = crawler.settings.get('PROMETHEUS_PORT', 8888)
-        self.host = crawler.settings.get('PROMETHEUS_HOST', '127.0.0.1')
+        self.port = crawler.settings.get('PROMETHEUS_PORT', [9410])
+        self.host = crawler.settings.get('PROMETHEUS_HOST', '0.0.0.0')
         self.path = crawler.settings.get('PROMETHEUS_PATH', 'metrics')
         self.interval = crawler.settings.get('PROMETHEUS_UPDATE_INTERVAL', 30)
 
@@ -95,7 +98,7 @@ class Prometheus(Site):
 
     def engine_started(self):
         # Start server endpoint for exporting metrics
-        self.promtheus = listen_tcp([self.port], self.host, self)
+        self.promtheus = listen_tcp(self.port, self.host, self)
 
         # Periodically update the metrics
         tsk = task.LoopingCall(self.update)
@@ -127,6 +130,7 @@ class Prometheus(Site):
         self.spr_item_scraped.labels(spider=self.name).inc()
 
     def update(self):
+        logging.debug(self.stats.get_stats())
 
         # Downloader Request Stats
         self.request_stats()
@@ -238,7 +242,7 @@ class Prometheus(Site):
             spider=self.name).observe(response_bytes)
 
     def logging_stats(self):
-        for i in ['DEBUG', 'ERROR', 'INFO', 'CRITICAL']:
+        for i in ['DEBUG', 'ERROR', 'INFO', 'CRITICAL', 'WARNING']:
             level = self.stats.get_value('log_count/{}'.format(i), 0)
             self.spr_log_count.labels(
                 spider=self.name, level=i).observe(level)

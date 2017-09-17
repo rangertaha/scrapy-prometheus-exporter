@@ -5,7 +5,7 @@ setup(
     name='scrapy-prometheus',
     version='1.0.0',
     url='https://github.com/rangertaha/scrapy-prometheus',
-    description='Scrapy extenstion to export stats to Prometheus',
+    description='Scrapy extension to export stats to Prometheus',
     author='rangertaha',
     license='MIT',
     packages=find_packages(exclude=('tests', 'tests.*')),
@@ -24,8 +24,7 @@ setup(
         'Topic :: Internet :: WWW/HTTP',
     ],
     install_requires=[
-        'Twisted>=10.0.0',
-        'Scrapy>=0.24.0',
-        'six>=1.5.2',
+        'prometheus-client>=0.0.20'
+        'Scrapy>=1.4.0',
     ],
 )
