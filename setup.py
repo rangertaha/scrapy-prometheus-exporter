@@ -7,6 +7,7 @@ setup(
     url='https://github.com/rangertaha/scrapy-prometheus',
     description='Scrapy extension to export stats to Prometheus',
     author='rangertaha',
+    author_email='rangertaha@gmail.com',
     license='MIT',
     packages=find_packages(exclude=('tests', 'tests.*')),
     include_package_data=True,
