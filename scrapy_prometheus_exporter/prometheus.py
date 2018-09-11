@@ -84,7 +84,7 @@ class WebService(Site):
 
         root = resource.Resource()
         self.promtheus = None
-        root.putChild(self.path, MetricsResource())
+        root.putChild(self.path.encode('utf-8'), MetricsResource())
         server.Site.__init__(self, root)
 
         crawler.signals.connect(self.engine_started, signals.engine_started)
@@ -215,9 +215,7 @@ class WebService(Site):
         of_count = self.stats.get_value('offsite/filtered', 0)
         self.spr_offsite_filtered_count.labels(
             spider=self.name).set(of_count)
-
-        print dir(self.stats.get_stats())
-
+        
     def request_stats(self):
         for i in ['GET', 'PUT', 'DELETE', 'POST']:
             stat = 'downloader/request_method_count/{}'.format(i)
