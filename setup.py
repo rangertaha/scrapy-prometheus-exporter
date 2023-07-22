@@ -25,7 +25,7 @@ setup(
         'Topic :: Internet :: WWW/HTTP',
     ],
     install_requires=[
-        'prometheus-client>=0.0.20'
+        'prometheus-client>=0.0.20',
         'Scrapy>=1.4.0',
     ],
 )
